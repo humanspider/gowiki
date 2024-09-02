@@ -11,6 +11,8 @@ import (
 
 const (
 	viewPath = "/view/"
+	editPath = "/edit/"
+	savePath = "/save/"
 )
 
 var mux *http.ServeMux
@@ -19,6 +21,8 @@ func init() {
 	mux = http.NewServeMux()
 	mux.HandleFunc("/", loveHandler)
 	mux.HandleFunc(viewPath, viewHandler)
+	mux.HandleFunc(editPath, editHandler)
+	mux.HandleFunc(savePath, saveHandler)
 }
 
 func main() {
@@ -39,27 +43,36 @@ func viewHandler(w http.ResponseWriter, r *http.Request) {
 	p, err := loadPage(title)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			w.WriteHeader(404)
-			fmt.Fprint(w, "Could not find page")
-			return
+			http.Redirect(w, r, editPath+title, http.StatusFound)
 		} else {
 			w.WriteHeader(500)
-			log.Fatal(err)
+			log.Print(err)
+			return
 		}
 	}
 
-	fBytes, err := os.ReadFile("templates/page-template.txt")
+	renderTemplate(w, "view", p)
+}
+
+func editHandler(w http.ResponseWriter, r *http.Request) {
+	title := r.URL.Path[len(editPath):]
+	p, err := loadPage(title)
+	if err != nil {
+		p = &Page{Title: title}
+	}
+
+	renderTemplate(w, "edit", p)
+}
+
+func saveHandler(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func renderTemplate(w http.ResponseWriter, tmpl string, p *Page) {
+	t, err := template.ParseFiles("templates/" + tmpl + ".html")
 	if err != nil {
 		w.WriteHeader(500)
 		log.Fatal(err)
 	}
-	t, err := template.New("page").Parse(string(fBytes))
-	if err != nil {
-		w.WriteHeader(500)
-		log.Fatal(err)
-	}
-	if err = t.Execute(w, p); err != nil {
-		w.WriteHeader(500)
-		log.Fatal(err)
-	}
+	t.Execute(w, p)
 }
